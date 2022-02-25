@@ -167,10 +167,12 @@ export function readDOMChange(view, from, to, typeOver, addedNodes) {
         (!inlineChange || addedNodes.some(n => n.nodeName == "DIV" || n.nodeName == "P"))) ||
        (!inlineChange && $from.pos < parse.doc.content.size &&
         (nextSel = Selection.findFrom(parse.doc.resolve($from.pos + 1), 1, true)) &&
-        nextSel.head == $to.pos)) &&
-      view.someProp("handleKeyDown", f => f(view, keyEvent(13, "Enter")))) {
-    view.lastIOSEnter = 0
-    return
+        nextSel.head == $to.pos))) {
+
+    if (!sameParentWithAtomicTextNodes($from, $to) && view.someProp("handleKeyDown", f => f(view, keyEvent(13, "Enter")))) {
+      view.lastIOSEnter = 0
+      return
+    }
   }
   // Same for backspace
   if (view.state.selection.anchor > change.start &&
@@ -250,6 +252,22 @@ export function readDOMChange(view, from, to, typeOver, addedNodes) {
   if (storedMarks) tr.ensureMarks(storedMarks)
   view.dispatch(tr.scrollIntoView())
 }
+
+function sameParentWithAtomicTextNodes($from, $to) {
+  var same = $from.pos - $from.parentOffset === $to.pos - $to.parentOffset;
+  if (!same && (isAtomicTextNode($from.parent) || isAtomicTextNode($to.parent))) {
+    var startOfThisParent = isAtomicTextNode($from.parent) ? $from.start($from.depth - 1) : $from.start($from.depth);
+    var startOfOtherParent = isAtomicTextNode($to.parent) ? $to.start($to.depth - 1) : $to.start($to.depth);
+    same = startOfThisParent === startOfOtherParent;
+  }
+
+  return same;
+}
+
+function isAtomicTextNode(node) {
+  return node && node.type && node.type.spec && node.type.spec.atomicTextNode;
+}
+
 
 function resolveSelection(view, doc, parsedSel) {
   if (Math.max(parsedSel.anchor, parsedSel.head) > doc.content.size) return null
